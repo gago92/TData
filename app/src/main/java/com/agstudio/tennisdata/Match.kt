@@ -1,42 +1,36 @@
 package com.agstudio.tennisdata
 
+import java.lang.RuntimeException
 import java.text.DateFormat
 
-open class Match(var numberOfSets: Int, var date: DateFormat, var result: MatchResult? = null) {
+open class Match(var numberOfSets: Int, var date: DateFormat, var result: MatchResult? = null, var isFirstPlayerServe: Boolean = true) {
 
-    var player1PointsInGame = TennisPoints.ZERO
-    var player2PointsInGame = TennisPoints.ZERO
-    private var activeSet = 0
-    private var isMatchEnded = false
-    private var sets: ArrayList<Pair<Int, Int>> = ArrayList() //0 index player1, 1 index player2
-    private var tieBreak: Pair<Int, Int>? = null
+    private var isMatchEnded = false // kell?
+    private val points: Array<TennisPoints> = arrayOf(TennisPoints.ZERO, TennisPoints.ZERO)
+    private var sets: ArrayList<Score> = ArrayList()
+    private var tieBreak: Score? = null
 
     fun startTheMatch() {
-        for (i in 0 until numberOfSets) {
-            sets.add(Pair(0, 0))
-        }
-        activeSet = 1
+        points[0] = TennisPoints.ZERO
+        points[1] = TennisPoints.ZERO
+        sets.add(Score(0, 0, isFirstPlayerServe))
     }
 
-    fun getPlayer1Sets(): List<Int> {
-        val list = ArrayList<Int>()
-        sets.forEach { set ->
-            list.add(set.first)
-        }
-        return list
-    }
-
-    fun getPlayer2Sets(): List<Int> {
-        val list = ArrayList<Int>()
-        sets.forEach { set ->
-            list.add(set.second)
+    fun getRecyclerViewAdapterDataForPlayer(indexOfPlayer: Int): ArrayList<String> {
+        val list: ArrayList<String> = ArrayList()
+        sets.forEach { score ->
+            if (indexOfPlayer == 0) {
+                list.add(score.firstPlayerPoint.toString())
+            } else {
+                list.add(score.secondPlayerPoint.toString())
+            }
         }
         return list
     }
 
-    fun getPlayer1Points(): String {
+    fun getPlayerPoints(indexOfPlayer: Int): String {
         return if (tieBreak == null) {
-            when(player1PointsInGame) {
+            when(points[indexOfPlayer]) {
                 TennisPoints.ZERO -> "0"
                 TennisPoints.FIFTEEN -> "15"
                 TennisPoints.THIRTY -> "30"
@@ -46,101 +40,74 @@ open class Match(var numberOfSets: Int, var date: DateFormat, var result: MatchR
                 TennisPoints.GAME -> "_"
             }
         } else {
-            tieBreak!!.first.toString()
-        }
-    }
-
-    fun getPlayer2Points(): String {
-        return if (tieBreak == null) {
-            when(player2PointsInGame) {
-                TennisPoints.ZERO -> "0"
-                TennisPoints.FIFTEEN -> "15"
-                TennisPoints.THIRTY -> "30"
-                TennisPoints.FORTY -> "40"
-                TennisPoints.ADVANTAGE -> "AD"
-                TennisPoints.DISADVANTAGE -> ""
-                TennisPoints.GAME -> "_"
+            tieBreak?.let { t ->
+                return if (indexOfPlayer == 0) {
+                    t.firstPlayerPoint.toString()
+                } else {
+                    t.secondPlayerPoint.toString()
+                }
             }
-        } else {
-            tieBreak!!.second.toString()
+            throw RuntimeException("Invalid tiebreak")
         }
     }
 
-    fun addPointToPlayer1() {
+    fun addPointToPlayer(indexOfPlayer: Int) {
         if (!inTiebreak()) {
-            player1PointsInGame = getPointWinnerPlayerTennisPoints(player1PointsInGame)
-            player2PointsInGame = getPointLoserPlayerTennisPoints(player2PointsInGame, 0)
-            if (player1PointsInGame == TennisPoints.GAME) {
-                player1PointsInGame = TennisPoints.ZERO
-                player2PointsInGame = TennisPoints.ZERO
-//                if (!actualSetIsDone(sets[activeSet - 1])) {
-                    sets[activeSet - 1] = Pair(sets[activeSet - 1].first + 1, sets[activeSet - 1].second)
-//                } else {
-//                    activeSet += 1
-//                    isMatchEnded = activeSet > numberOfSets
-//                    tieBreak = null
-//                }
+            if (indexOfPlayer == 0) {
+                points[0] = getPointWinnerPlayerTennisPoints(points[0])
+                points[1] = getPointLoserPlayerTennisPoints(points[1], points[0])
+            } else {
+                points[1] = getPointWinnerPlayerTennisPoints(points[1])
+                points[0] = getPointLoserPlayerTennisPoints(points[0], points[1])
+            }
+            if (points[0] == TennisPoints.GAME || points[1] == TennisPoints.GAME) {
+                points[0] = TennisPoints.ZERO
+                points[1] = TennisPoints.ZERO
+                if (indexOfPlayer == 0) {
+                    sets.last().firstPlayerPoint += 1
+                } else {
+                    sets.last().secondPlayerPoint += 1
+                }
+                sets.last().isFirstPlayerServe = sets.last().isFirstPlayerServe.not()
             }
         } else {
             if (tieBreak == null) {
-                tieBreak = Pair(0, 0)
+                tieBreak = Score(0, 0, sets.last().isFirstPlayerServe)
             }
-            tieBreak?.let {
-                tieBreak = Pair(it.first + 1, it.second)
-                if (isTieBreakEnded()) {
-                    startNewSetWithPlayer1WonLastSet()
+            if (indexOfPlayer == 0) {
+                tieBreak!!.firstPlayerPoint += 1
+            } else {
+                tieBreak!!.secondPlayerPoint += 1
+            }
+            if (isTieBreakEnded(7)) {
+                tieBreak?.let { t ->
+                    if (t.firstPlayerPoint > t.secondPlayerPoint) {
+                        sets.last().firstPlayerPoint += 1
+                    } else {
+                        sets.last().secondPlayerPoint += 1
+                    }
                 }
+                tieBreak = null
+                endOfSet()
             }
         }
-        if (actualSetIsDone(sets[activeSet - 1])) {
-            activeSet += 1
-            isMatchEnded = activeSet > numberOfSets
-            tieBreak = null
+        if (actualSetIsDone(sets.last())) {
+            endOfSet()
         }
     }
 
-    fun addPointToPlayer2() {
-        if (!inTiebreak()) {
-            player2PointsInGame = getPointWinnerPlayerTennisPoints(player2PointsInGame)
-            player1PointsInGame = getPointLoserPlayerTennisPoints(player1PointsInGame, 1)
-            if (player2PointsInGame == TennisPoints.GAME) {
-                player1PointsInGame = TennisPoints.ZERO
-                player2PointsInGame = TennisPoints.ZERO
-                sets[activeSet - 1] = Pair(sets[activeSet - 1].first, sets[activeSet - 1].second + 1)
-            }
+    private fun endOfSet() {
+        if (sets.size == numberOfSets) {
+            isMatchEnded = true
         } else {
-            if (tieBreak == null) {
-                tieBreak = Pair(0, 0)
-            }
-            tieBreak?.let {
-                tieBreak = Pair(it.first, it.second + 1)
-                if (isTieBreakEnded()) {
-                    startNewSetWithPlayer2WonLastSet()
-                }
-            }
-        }
-        if (actualSetIsDone(sets[activeSet - 1])) {
-            activeSet += 1
-            isMatchEnded = activeSet > numberOfSets
-            tieBreak = null
+            sets.add(Score(0, 0, !sets.last().isFirstPlayerServe))
         }
     }
 
-    private fun startNewSetWithPlayer1WonLastSet() {
-        player1PointsInGame = TennisPoints.ZERO
-        player2PointsInGame = TennisPoints.ZERO
-        sets[activeSet - 1] = Pair(sets[activeSet - 1].first + 1, sets[activeSet - 1].second)
-    }
-
-    private fun startNewSetWithPlayer2WonLastSet() {
-        player1PointsInGame = TennisPoints.ZERO
-        player2PointsInGame = TennisPoints.ZERO
-        sets[activeSet - 1] = Pair(sets[activeSet - 1].first, sets[activeSet - 1].second + 1)
-    }
-
-    private fun isTieBreakEnded(): Boolean {
+    private fun isTieBreakEnded(maxPoint: Int): Boolean {
         tieBreak?.let {
-            return (it.first > 6 && it.first - it.second > 1) || (it.second > 6 && it.second - it.first > 1)
+            return (it.firstPlayerPoint > maxPoint - 1 && it.firstPlayerPoint - it.secondPlayerPoint > 1) ||
+                    (it.secondPlayerPoint > maxPoint - 1 && it.secondPlayerPoint - it.firstPlayerPoint > 1)
         }
         return false
     }
@@ -157,7 +124,7 @@ open class Match(var numberOfSets: Int, var date: DateFormat, var result: MatchR
                 TennisPoints.FORTY
             }
             TennisPoints.FORTY -> {
-                if (player1PointsInGame == TennisPoints.FORTY && player2PointsInGame == TennisPoints.FORTY) {
+                if (points[0] == TennisPoints.FORTY && points[1] == TennisPoints.FORTY) {
                     TennisPoints.ADVANTAGE
                 } else {
                     TennisPoints.GAME
@@ -175,35 +142,32 @@ open class Match(var numberOfSets: Int, var date: DateFormat, var result: MatchR
         }
     }
 
-    private fun getPointLoserPlayerTennisPoints(actualPoints: TennisPoints, playerIndex: Int): TennisPoints {
-        when(actualPoints) {
+    private fun getPointLoserPlayerTennisPoints(actualPoints: TennisPoints, winnerPoints: TennisPoints): TennisPoints {
+        return when(actualPoints) {
             TennisPoints.FORTY -> {
-                val otherPlayerTennisPoints = if(playerIndex == 1) {
-                    player2PointsInGame
+                if (winnerPoints == TennisPoints.ADVANTAGE) {
+                    TennisPoints.DISADVANTAGE
                 } else {
-                    player1PointsInGame
-                }
-                if (otherPlayerTennisPoints == TennisPoints.ADVANTAGE) {
-                    return TennisPoints.DISADVANTAGE
+                    TennisPoints.FORTY
                 }
             }
             TennisPoints.ADVANTAGE -> {
-                return TennisPoints.FORTY
+                TennisPoints.FORTY
+            }
+            else -> {
+                actualPoints
             }
         }
-        return actualPoints
     }
 
     private fun inTiebreak(): Boolean {
-        return sets[activeSet - 1].first == 6 && sets[activeSet - 1].second == 6
+        return sets.last().firstPlayerPoint == 6 && sets.last().secondPlayerPoint == 6
     }
 
-    private fun actualSetIsDone(set: Pair<Int, Int>): Boolean {
-        return ((set.first == 6 && set.second <= 4) ||
-                (set.second == 6 && set.first <= 4) ||
-                (set.first == 7) ||
-                (set.second == 7))
+    private fun actualSetIsDone(set: Score): Boolean {
+        return ((set.firstPlayerPoint == 6 && set.secondPlayerPoint <= 4) ||
+                (set.secondPlayerPoint == 6 && set.firstPlayerPoint <= 4) ||
+                (set.firstPlayerPoint == 7) ||
+                (set.secondPlayerPoint == 7))
     }
-
-    fun addNewSet() {}
 }

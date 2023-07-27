@@ -10,8 +10,8 @@ import kotlin.collections.ArrayList
 
 class MainActivity : AppCompatActivity() {
 
-    private val adapterPlayer1 = SetsRecyclerViewAdapter(arrayListOf("0", "0"))
-    private val adapterPlayer2 = SetsRecyclerViewAdapter(arrayListOf("0", "0"))
+    private val adapterPlayer1 = SetsRecyclerViewAdapter(ArrayList())
+    private val adapterPlayer2 = SetsRecyclerViewAdapter(ArrayList())
     private lateinit var binding: ActivityMainBinding
     private lateinit var match: Match
 
@@ -38,27 +38,19 @@ class MainActivity : AppCompatActivity() {
 
         refreshScreen()
         binding.upperLayout.setOnClickListener{
-            match.addPointToPlayer1()
+            match.addPointToPlayer(0)
             refreshScreen()
         }
         binding.downerLayout.setOnClickListener {
-            match.addPointToPlayer2()
+            match.addPointToPlayer(1)
             refreshScreen()
         }
     }
 
     private fun refreshScreen() {
-        val player1SetsStrings = ArrayList<String>()
-        match.getPlayer1Sets().forEach { set ->
-            player1SetsStrings.add(set.toString())
-        }
-        adapterPlayer1.addAll(player1SetsStrings)
-        val player2SetsStrings = ArrayList<String>()
-        match.getPlayer2Sets().forEach { set ->
-            player2SetsStrings.add(set.toString())
-        }
-        adapterPlayer2.addAll(player2SetsStrings)
-        binding.Player1PointsTextView.text = match.getPlayer1Points()
-        binding.Player2PointsTextView.text = match.getPlayer2Points()
+        adapterPlayer1.addAll(match.getRecyclerViewAdapterDataForPlayer(0))
+        adapterPlayer2.addAll(match.getRecyclerViewAdapterDataForPlayer(1))
+        binding.Player1PointsTextView.text = match.getPlayerPoints(0)
+        binding.Player2PointsTextView.text = match.getPlayerPoints(1)
     }
 }
