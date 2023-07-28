@@ -33,7 +33,11 @@ class MainActivity : AppCompatActivity() {
         binding.player2SetsRecyclerView.adapter = adapterPlayer2
         binding.player2SetsRecyclerView.layoutManager = LinearLayoutManager(applicationContext, LinearLayoutManager.HORIZONTAL, false)
 
-        match = Match(2, DateFormat.getDateInstance())
+        match = Match(
+            MatchSettings(
+            true, 2, "Szabolcs", "Gabor", true, true, true, 6, false, Calendar.getInstance()
+        ) //TODO settingek hasznalata a match-ben
+        )
         match.startTheMatch()
 
         refreshScreen()

@@ -3,7 +3,7 @@ package com.agstudio.tennisdata
 import java.lang.RuntimeException
 import java.text.DateFormat
 
-open class Match(var numberOfSets: Int, var date: DateFormat, var result: MatchResult? = null, var isFirstPlayerServe: Boolean = true) {
+open class Match(private val settings: MatchSettings) {
 
     private var isMatchEnded = false // kell?
     private val points: Array<TennisPoints> = arrayOf(TennisPoints.ZERO, TennisPoints.ZERO)
@@ -13,7 +13,7 @@ open class Match(var numberOfSets: Int, var date: DateFormat, var result: MatchR
     fun startTheMatch() {
         points[0] = TennisPoints.ZERO
         points[1] = TennisPoints.ZERO
-        sets.add(Score(0, 0, isFirstPlayerServe))
+        sets.add(Score(0, 0, settings.isFirstPlayerStartServe))
     }
 
     fun getRecyclerViewAdapterDataForPlayer(indexOfPlayer: Int): ArrayList<String> {
@@ -97,11 +97,32 @@ open class Match(var numberOfSets: Int, var date: DateFormat, var result: MatchR
     }
 
     private fun endOfSet() {
-        if (sets.size == numberOfSets) {
+        if (sets.size == settings.winnerSetsNumber + settings.winnerSetsNumber - 1 || oneOfPlayersWin()) {
             isMatchEnded = true
         } else {
             sets.add(Score(0, 0, !sets.last().isFirstPlayerServe))
         }
+    }
+
+    private fun oneOfPlayersWin(): Boolean {
+        var firstPlayerWinnerSetsNumber = 0
+        var secondPlayerWinnerSetsNumber = 0
+        sets.forEachIndexed { i, set ->
+            if (i < sets.size - 1 && set.firstPlayerPoint > set.secondPlayerPoint) {
+                firstPlayerWinnerSetsNumber += 1
+            } else {
+                secondPlayerWinnerSetsNumber += 1
+            }
+        }
+        val p1 = sets[sets.size -1].firstPlayerPoint
+        val p2 = sets[sets.size -1].secondPlayerPoint
+        if (p1 == 7 || p1 == 6 && p2 <= 4) {
+            firstPlayerWinnerSetsNumber += 1
+        }
+        if (p2 == 7 || p2 ==6 && p1 <= 4) {
+            secondPlayerWinnerSetsNumber += 1
+        }
+        return firstPlayerWinnerSetsNumber == settings.winnerSetsNumber || secondPlayerWinnerSetsNumber == settings.winnerSetsNumber
     }
 
     private fun isTieBreakEnded(maxPoint: Int): Boolean {
